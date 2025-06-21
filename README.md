@@ -40,7 +40,7 @@ CogniConnect bridges the gap between brain organization and cognitive function b
 - **Preprocessing**: Z-normalized BOLD signals
 - **Size**: ~2.6GB (500 × 92 × 1200 array)
 
-#### 2. Behavioral Data (`behavior_data_with_headers_cleaned-2.csv`)
+#### 2. Behavioral Data (`behavior_data_with_headers_cleaned.csv`)
 - **Features**: 35 behavioral/demographic measures
 - **Cognitive Domains**:
   - **Executive Function**: CardSort, Flanker tasks
@@ -55,6 +55,18 @@ CogniConnect bridges the gap between brain organization and cognitive function b
 - **Network Affiliation**: VisCent, DefaultB, SalVentAttnA, etc.
 - **Spatial Information**: Hemisphere (LH/RH), RGB coordinates
 - **Visualization Support**: For network analysis and plotting
+
+### Processed Data Files (Generated During Analysis)
+
+#### 4. Connectivity Features (`features/conn_matrix_all.npy`)
+- **Shape**: (500, 4186) - All subjects × unique connections
+- **Content**: Complete functional connectivity matrix
+- **Derivation**: Upper triangular correlations between all ROI pairs
+
+#### 5. Behavioral Targets (`target_matrix.npy`)  
+- **Shape**: (500, 17) - All subjects × behavioral measures
+- **Content**: Preprocessed and cleaned behavioral scores
+- **Processing**: Missing value imputation, normalization
 
 ## 🚀 Getting Started
 
@@ -76,20 +88,46 @@ joblib>=1.1.0
 multiprocessing
 ```
 
-### Installation
+### Installation and Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/shwetashardul/cogniconnect.git
-cd cogniconnect
+# Clone the repository  
+git clone https://github.com/yourusername/cogniconnect.git
+cd final_cogniconnect_extracted/Final\ Cogniconnect/
 
 # Install dependencies
-pip install -r requirements.txt
+pip install numpy pandas scikit-learn matplotlib seaborn jupyter
 
-# For HPC environments with conda
-conda env create -f environment.yml
+# Alternative: Create conda environment
+conda create -n cogniconnect python=3.8
 conda activate cogniconnect
+conda install numpy pandas scikit-learn matplotlib seaborn jupyter
+
+# Launch Jupyter to run notebooks
+jupyter notebook
 ```
+
+### Reproducing the Analysis
+
+1. **Start with Data Exploration**:
+   ```bash
+   # Open the initial exploration notebook
+   jupyter notebook exp1.ipynb
+   ```
+
+2. **Run Feature Selection Analysis**:
+   ```bash  
+   # Analyze connectivity patterns and feature optimization
+   jupyter notebook fc_focused.ipynb
+   ```
+
+3. **Execute Main Pipeline**:
+   ```bash
+   # Run the complete analysis pipeline
+   jupyter notebook features/final\ final.ipynb
+   ```
+
+**Note**: The main fMRI data file (`hcp_data.npy`) must be obtained separately from the Human Connectome Project and placed in the root directory.
 
 ### Data Setup
 
@@ -100,15 +138,18 @@ conda activate cogniconnect
 
 2. **Prepare Data Structure**
    ```
-   cogniconnect/
-   ├── data/
-   │   ├── hcp_data.npy                    # Main fMRI data (YOU MUST PROVIDE)
-   │   ├── behavior_data_with_headers_cleaned-2.csv
-   │   └── roi_info_cleaned.csv
-   ├── src/
-   ├── results/
-   └── README.md
+   final_cogniconnect_extracted/
+   └── Final Cogniconnect/
+       ├── hcp_data.npy                          # Main fMRI data (YOU MUST PROVIDE)
+       ├── behavior_data_with_headers_cleaned.csv
+       ├── roi_info_cleaned.csv
+       └── [rest of project structure as shown above]
    ```
+
+3. **Required Data Files**
+   - **`hcp_data.npy`**: Original fMRI timeseries (500×92×1200) - **NOT INCLUDED**
+   - **`behavior_data_with_headers_cleaned.csv`**: Included - behavioral measures
+   - **`roi_info_cleaned.csv`**: Included - brain region information
 
 ## 🔬 Methodology Deep Dive
 
@@ -253,65 +294,85 @@ Outer Loop (5-fold CV): Performance Estimation
 
 ## 🧪 Usage Examples
 
-### Basic Prediction Pipeline
+### Running the Analysis Pipeline
+
+**Primary Analysis Notebook**: `features/final final.ipynb`
+This is the main notebook containing the complete analysis pipeline.
 
 ```python
-# Load preprocessed data
-connectivity_features = load_connectivity_features()
-behavioral_targets = load_behavioral_data()
+# Main workflow (conceptual overview of notebook structure)
 
-# Initialize CogniConnect pipeline
-from cogniconnect import BrainBehaviorPredictor
+# 1. Data Loading and Preprocessing
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import Ridge
 
-predictor = BrainBehaviorPredictor(
-    feature_selection='target_specific',
-    model_type='ridge',
-    validation='nested_cv'
-)
+# Load preprocessed connectivity features and behavioral data
+conn_features = np.load('features/conn_matrix_all.npy')  # (500, 4186)
+behavioral_data = pd.read_csv('cleaned_behavior_data.csv')
+target_matrix = np.load('target_matrix.npy')
 
-# Fit model for specific cognitive domain
-predictor.fit(connectivity_features, behavioral_targets['Flanker_AgeAdj'])
-
-# Generate predictions
-predictions = predictor.predict(new_connectivity_data)
-performance = predictor.evaluate()
+# 2. Target-Specific Feature Selection
+# For each of the 17 behavioral targets
+for target_name in behavioral_targets:
+    # Load optimized features for this target
+    selected_features = np.load(f'features/final_selected_features/{target_name}_selected.npy')
+    
+    # Run nested cross-validation
+    model = Ridge(alpha=215.44)  # Optimal alpha from hyperparameter tuning
+    cv_scores = cross_val_score(model, selected_features, target_scores, cv=5)
+    
+    print(f"{target_name}: R² = {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 ```
 
-### Advanced Feature Analysis
+### Exploring Feature Selection Results
 
+**Feature Selection Exploration**: `fc_focused.ipynb`
 ```python
-# Analyze feature importance across cognitive domains
-from cogniconnect import FeatureAnalyzer
+# Analyze feature selection optimization results
+fc_performance = pd.read_csv('features/topk_fc_per_target/fc_selection_performance.csv')
+pca_summary = pd.read_csv('features/topk_fc_per_target/pca_summary_fc.csv')
 
-analyzer = FeatureAnalyzer()
-importance_map = analyzer.compute_domain_specific_importance(
-    connectivity_features, 
-    all_behavioral_targets
-)
+# Plot optimization curves for different feature counts (10, 20, 30, 40, 50)
+import matplotlib.pyplot as plt
 
-# Visualize brain networks
-analyzer.plot_network_importance(importance_map, roi_info)
+for target in targets:
+    target_data = fc_performance[fc_performance['target'] == target]
+    plt.plot(target_data['n_features'], target_data['cv_score'], 
+             label=target, marker='o')
+
+plt.xlabel('Number of Features')
+plt.ylabel('Cross-Validation R²')
+plt.legend()
+plt.title('Feature Selection Optimization')
+plt.show()
 ```
 
-### High-Performance Computing Configuration
+### Initial Exploration and Experimentation
 
+**Exploratory Analysis**: `exp1.ipynb`
 ```python
-# Configure parallel processing
-from cogniconnect import HPCConfig
+# Initial data exploration and method testing
+# - Data quality assessment
+# - Initial feature extraction experiments  
+# - Baseline model comparisons
+# - Visualization of brain connectivity patterns
 
-config = HPCConfig(
-    n_cpu_cores=120,
-    n_gpu_devices=4,
-    batch_size=50,
-    memory_limit='32GB'
-)
+# Load and explore behavioral data
+behavior_df = pd.read_csv('behavior_data_with_headers_cleaned.csv')
+roi_info = pd.read_csv('roi_info_cleaned.csv')
 
-# Run full analysis pipeline
-results = run_full_analysis(
-    hcp_data_path='data/hcp_data.npy',
-    config=config,
-    output_dir='results/'
-)
+# Basic statistics and correlations
+print("Behavioral data shape:", behavior_df.shape)
+print("Missing values:", behavior_df.isnull().sum())
+
+# Correlation matrix of behavioral measures
+correlation_matrix = behavior_df.corr()
+plt.figure(figsize=(12, 10))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', center=0)
+plt.title('Behavioral Measures Correlation Matrix')
+plt.show()
 ```
 
 ## 📊 Interpreting Results
@@ -345,95 +406,147 @@ results = run_full_analysis(
 - **Feature Sparsity**: Only 6-8 connections needed (Lasso selection)
 - **Interpretation**: Language has focal neural architecture
 
-## 🔧 Technical Implementation Details
+## 🔧 Key Notebooks and Files
 
-### Memory Management
+### 📊 Core Analysis Files
 
-**Large Data Handling**:
-```python
-# Efficient memory usage for 2.6GB+ datasets
-def process_subjects_in_batches(data, batch_size=50):
-    n_subjects = data.shape[0]
-    for start_idx in range(0, n_subjects, batch_size):
-        end_idx = min(start_idx + batch_size, n_subjects)
-        yield data[start_idx:end_idx]
+#### 1. **`features/final final.ipynb`** - Main Analysis Pipeline
+- **Purpose**: Complete brain-behavior prediction pipeline
+- **Key Components**:
+  - Nested cross-validation implementation
+  - Target-specific feature selection
+  - Model comparison (Ridge, Lasso, ElasticNet, Random Forest, SVR)
+  - Statistical validation with permutation testing
+  - Final performance evaluation
+- **Outputs**: 
+  - `nested_cv_results_all_targets.csv`
+  - Individual feature files in `final_selected_features/`
+
+#### 2. **`fc_focused.ipynb`** - Functional Connectivity Analysis
+- **Purpose**: Deep dive into connectivity patterns and optimization
+- **Key Components**:
+  - Feature selection strategy comparison
+  - PCA dimensionality reduction analysis
+  - Connectivity matrix visualization
+  - Network-specific analysis
+- **Outputs**:
+  - `fc_selection_performance.csv`
+  - `pca_summary_fc.csv`
+  - Top-k feature files in `topk_fc_per_target/`
+
+#### 3. **`exp1.ipynb`** - Initial Exploration
+- **Purpose**: Data exploration and preliminary analysis
+- **Key Components**:
+  - Data quality assessment
+  - Behavioral correlations analysis
+  - Initial connectivity extraction
+  - Baseline model testing
+- **Outputs**: Exploratory plots and initial findings
+
+### 📈 Results and Performance Files
+
+#### **`model_performance_results.csv`**
+Contains final performance metrics for all 17 behavioral targets:
+```csv
+target,best_model,best_r2,r2_std,best_params,feature_selection_method
+Flanker_AgeAdj,Ridge,0.1713,0.0379,alpha=215.44,f_regression
+Flanker_Unadj,Ridge,0.1437,0.0584,alpha=215.44,f_regression
+ProcSpeed_Unadj,Ridge,0.1295,0.0435,alpha=215.44,f_regression
+...
 ```
 
-**Connectivity Computation Optimization**:
-```python
-# Parallel correlation matrix computation
-from joblib import Parallel, delayed
-
-def compute_connectivity_parallel(timeseries_data, n_jobs=-1):
-    return Parallel(n_jobs=n_jobs)(
-        delayed(np.corrcoef)(subject_data.T) 
-        for subject_data in timeseries_data
-    )
+#### **`feature_selection_comparison.csv`**
+Comparison of feature selection strategies across targets:
+```csv
+target,f_regression_score,mutual_info_score,lasso_score,rf_importance_score,best_method
+CardSort_AgeAdj,0.1162,0.0892,0.1089,0.1043,f_regression
+PicVocab_Unadj,0.0876,0.0798,0.0924,0.0812,lasso
+SCPT_SEN,0.0234,0.0287,0.0198,0.0341,rf_importance
+...
 ```
 
-### Hyperparameter Optimization
-
-**Ridge Regression Tuning**:
-```python
-# Logarithmic alpha search space
-alpha_range = np.logspace(-3, 3, 50)  # 0.001 to 1000
-
-# HalvingGridSearchCV for efficiency
-from sklearn.experimental import enable_halving_search_cv
-from sklearn.model_selection import HalvingGridSearchCV
-
-search = HalvingGridSearchCV(
-    Ridge(), 
-    {'alpha': alpha_range},
-    factor=2,
-    cv=3
-)
+#### **`nested_cv_results_all_targets.csv`**
+Detailed cross-validation results with fold-by-fold performance:
+```csv
+target,fold,train_r2,test_r2,model_type,n_features,alpha
+Flanker_AgeAdj,1,0.1856,0.1642,Ridge,30,215.44
+Flanker_AgeAdj,2,0.1789,0.1721,Ridge,30,215.44
+...
 ```
+
+### 🧬 Processed Feature Files
+
+#### **`features/conn_matrix_all.npy`**
+- **Shape**: (500, 4186) 
+- **Content**: Complete functional connectivity matrix for all subjects
+- **Description**: All unique pairwise correlations between 92 brain regions
+- **Calculation**: Upper triangular of correlation matrices (excluding diagonal)
+
+#### **`features/final_selected_features/`**
+Target-specific optimized features:
+- **Naming Convention**: `{TARGET_NAME}_selected.npy`
+- **Typical Shape**: (500, 20-40) depending on target
+- **Selection Method**: Varies by target (F-regression, Lasso, or Random Forest)
+- **Optimization**: Based on cross-validation performance
+
+#### **`features/topk_fc_per_target/`**
+Feature count optimization results:
+- **File Pattern**: `{TARGET_NAME}_top{K}.npy` where K ∈ {10, 20, 30, 40, 50}
+- **Purpose**: Systematic evaluation of optimal feature count
+- **Analysis**: Performance vs. feature count trade-off curves
 
 ## 📁 Project Structure
 
 ```
-cogniconnect/
-├── src/
-│   ├── __init__.py
-│   ├── data_preprocessing/
-│   │   ├── connectivity_extraction.py
-│   │   ├── behavioral_processing.py
-│   │   └── quality_control.py
-│   ├── feature_engineering/
-│   │   ├── feature_selection.py
-│   │   ├── dimensionality_reduction.py
-│   │   └── target_specific_selection.py
-│   ├── modeling/
-│   │   ├── brain_behavior_predictor.py
-│   │   ├── model_comparison.py
-│   │   └── validation_framework.py
-│   ├── analysis/
-│   │   ├── performance_evaluation.py
-│   │   ├── feature_importance.py
-│   │   └── statistical_testing.py
-│   └── visualization/
-│       ├── brain_network_plots.py
-│       ├── performance_visualization.py
-│       └── feature_maps.py
-├── data/
-│   ├── hcp_data.npy                    # NOT INCLUDED - MUST OBTAIN FROM HCP
-│   ├── behavior_data_with_headers_cleaned-2.csv
-│   ├── roi_info_cleaned.csv
-│   └── processed/                      # Generated during analysis
-├── results/
-│   ├── model_performance/
-│   ├── feature_importance/
-│   ├── statistical_validation/
-│   └── visualizations/
-├── notebooks/
-│   ├── 01_data_exploration.ipynb
-│   ├── 02_feature_engineering.ipynb
-│   ├── 03_model_development.ipynb
-│   └── 04_results_analysis.ipynb
-├── requirements.txt
-├── environment.yml
-└── README.md
+cogniconnect_extracted/
+└── Cogniconnect/
+    ├── behavior_data_with_headers_cleaned.csv    # Original behavioral data
+    ├── cleaned_behavior_data.csv                 # Preprocessed behavioral measures
+    ├── roi_info_cleaned.csv                      # Brain region information (92 ROIs)
+    ├── target_matrix.npy                         # Processed behavioral targets matrix
+    │
+    ├── exp1.ipynb                                # Initial exploration and experimentation
+    ├── fc_focused.ipynb                          # Functional connectivity analysis notebook
+    │
+    ├── features/
+    │   ├── conn_matrix_all.npy                   # Full connectivity matrices (500×4186)
+    │   ├── final final.ipynb                     # Main analysis pipeline notebook
+    │   ├── nested_cv_results_all_targets.csv     # Cross-validation results summary
+    │   │
+    │   ├── final_selected_features/              # Optimal features per target
+    │   │   ├── CardSort_AgeAdj_selected.npy      # Executive function features
+    │   │   ├── CardSort_Unadj_selected.npy
+    │   │   ├── Flanker_AgeAdj_selected.npy       # Inhibitory control features
+    │   │   ├── Flanker_Unadj_selected.npy
+    │   │   ├── Language_Task_Acc_selected.npy    # Language processing features
+    │   │   ├── ListSort_AgeAdj_selected.npy      # Working memory features
+    │   │   ├── ListSort_Unadj_selected.npy
+    │   │   ├── MMSE_Score_selected.npy           # General cognition features
+    │   │   ├── PicVocab_AgeAdj_selected.npy      # Vocabulary features
+    │   │   ├── PicVocab_Unadj_selected.npy
+    │   │   ├── ProcSpeed_AgeAdj_selected.npy     # Processing speed features
+    │   │   ├── ProcSpeed_Unadj_selected.npy
+    │   │   ├── ReadEng_AgeAdj_selected.npy       # Reading ability features
+    │   │   ├── ReadEng_Unadj_selected.npy
+    │   │   ├── SCPT_SEN_selected.npy             # Attention sensitivity features
+    │   │   ├── SCPT_SPEC_selected.npy            # Attention specificity features
+    │   │   └── WM_Task_Acc_selected.npy          # Working memory accuracy features
+    │   │
+    │   └── topk_fc_per_target/                   # Feature selection optimization
+    │       ├── CardSort_AgeAdj_top10.npy         # Top 10 features for each target
+    │       ├── CardSort_AgeAdj_top20.npy         # Top 20 features for each target
+    │       ├── CardSort_AgeAdj_top30.npy         # Top 30 features for each target
+    │       ├── CardSort_AgeAdj_top40.npy         # Top 40 features for each target
+    │       ├── CardSort_AgeAdj_top50.npy         # Top 50 features for each target
+    │       ├── [... similar files for all 17 targets ...]
+    │       ├── fc_selection_performance.csv       # Feature count optimization results
+    │       └── pca_summary_fc.csv                # PCA dimensionality reduction summary
+    │
+    ├── feature_selection_comparison.csv          # Comparison of selection strategies
+    ├── model_performance_results.csv             # Final model performance metrics
+    └── optimization_results.png                  # Visualization of optimization process
+
+# Note: hcp_data.npy (original fMRI data) not included due to confidentiality
 ```
 
 ## 🎯 Key Findings and Implications
@@ -514,8 +627,6 @@ We welcome contributions to improve CogniConnect! Areas for contribution:
 - **Documentation improvements**
 - **Testing and validation**
 
-Please see `CONTRIBUTING.md` for detailed guidelines.
-
 ## 📄 License
 
 This project is licensed under the MIT License - see `LICENSE` file for details.
@@ -529,6 +640,8 @@ Email: svs28@njit.edu
 Institution: New Jersey Institute of Technology  
 Advisor: Professor Mengjia Xu  
 
+**Project Links**:
+- GitHub Repository: https://github.com/shwetashardul/CogniConnect/
 
 ## 🙏 Acknowledgments
 
